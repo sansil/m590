@@ -11,7 +11,7 @@
 #include <HardwareSerial.h>
 #include <stdint.h>
 
-typedef enum MODEM_STATE {OK_MODEM,ERROR_MODEM,SEND_SMS_MODEM,INIT_MODEM, SEND_TCP_MODEM, SEND_FTP_FILE, MESSAGE_RECIVED_TCP, NO_TASK_MODEM};
+typedef enum MODEM_STATE {OK_MODEM,ERROR_MODEM,SEND_SMS_MODEM,INIT_MODEM, SEND_TCP_MODEM, SEND_FTP_FILE, MESSAGE_RECIVED_TCP, RESET_MODEM, NO_TASK_MODEM};
 
 void initModem(uint16_t unPuerto, uint16_t untimeout, MODEM_STATE* errorModem);
 void enviarDatosTCP(char* TCPBufferOut, char* dns, char *mensajeTcpRecivido, bool respuesta);

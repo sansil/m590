@@ -7,7 +7,7 @@ char* modemBufferIn;
 static char ipServer[20]; 
 bool conRespuesta =true;
 char s[2]; //!< auxiliar .
-static  struct pt pt1, pt2,pt3, pt4; //!< cada protohtread necesita uno de estos
+static  struct pt pt1, pt2,pt3, pt4, pt5; //!< cada protohtread necesita uno de estos
 //variables para checkResponseATcommand.
 static volatile  int iATcommand=0;
 //static int answer;
@@ -310,6 +310,7 @@ void initModem(uint16_t unPuerto, uint16_t untimeout,MODEM_STATE* errorModem){
   PT_INIT(&pt2);  // protothread variables
   PT_INIT(&pt3);
   PT_INIT(&pt4);  // protothread variables
+  PT_INIT(&pt5);
   ESTADO_MODEM = INIT_MODEM;
   puerto = unPuerto;
   timeOutModem = untimeout; 
@@ -344,12 +345,42 @@ void resetVariables(){
   //answer = 0;
 }
 
+int _resetearModem(struct pt *pt){
+  PT_BEGIN(pt);
+    resetVariables();
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem));
+    //chequeo intensidad de senal 
+    Serial.println("intensidad de senal: ");
+    Serial1.println("AT+CSQ");
+    resetVariables();
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem) || checkResponseATcommand("","OK"));
+    resetVariables();
+    Serial1.println(Serial1.println("AT+TCPCLOSE=0"));
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem) || checkResponseATcommand("","OK"));
+    *OK_ERROR_MODEM = OK_MODEM;
+    ESTADO_MODEM = INIT_MODEM; //reseteo el modem.
+  PT_END(pt);
+}
+
+// int freeRam () 
+// {
+//   extern int __heap_start, *__brkval; 
+//   int v; 
+//   return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+// }
+
 void resetearModem(){
-  Serial1.println("AT+TCPCLOSE=0"); //cierro puerto TCO
-  delay(100);
-  Serial1.println("AT+FTPLOGOUT"); // cieroo puerto FTP
-  *OK_ERROR_MODEM = OK_MODEM;
-  ESTADO_MODEM = INIT_MODEM; //reseteo el modem.
+
+  Serial.println("reseteando Modem...");
+  ESTADO_MODEM = RESET_MODEM;
+  // delay(1000);
+  // //chequeo intensidad de senal 
+  // Serial1.println("AT+CSQ");
+  // Serial1.println("AT+TCPCLOSE=0"); //cierro puerto TCO
+  // delay(2000);
+  // Serial1.println("AT+FTPLOGOUT"); // cieroo puerto FTP
+  // *OK_ERROR_MODEM = OK_MODEM;
+  // ESTADO_MODEM = INIT_MODEM; //reseteo el modem.
 }
 
 void clearErrorModem(MODEM_STATE* errorModem){
@@ -478,7 +509,9 @@ void modemTask(){
     case INIT_MODEM:
       _initModem(&pt1);
       break;
-    
+    case RESET_MODEM:
+      _resetearModem(&pt5);
+      break;
     case SEND_TCP_MODEM:
       _enviarDatosTCP(ptch,pDns,&pt2);
       break;
