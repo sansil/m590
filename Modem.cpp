@@ -5,6 +5,7 @@ static char strAux[50]; //!<String auxiliar para cargar el mensaje TCPSEND
 static char strAux2[250]; //!<String auxiliar para cargar el mensaje TCPSEND
 char* modemBufferIn;
 static char ipServer[20]; 
+bool conRespuesta =true;
 char s[2]; //!< auxiliar .
 static  struct pt pt1, pt2,pt3, pt4; //!< cada protohtread necesita uno de estos
 //variables para checkResponseATcommand.
@@ -235,6 +236,9 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     //*OK_ERROR_MODEM = ERROR_MODEM;
     Serial.println("Entre a SEND_TCP_MODEM");
     resetVariables();
+    //primero verifico si ya estoy conectado
+    //Serial1.println("AT+IPSTATUS=0");
+    //PT_WAIT_UNTIL(pt, (millis()-timestamp > 3*timeOutModem) || checkResponseATcommand("","CONNECT"));
     memset(ipServer,'\0',20); // borro el bufferIp antes de empezar.
     strcpy(strAux,"AT+DNS=\"");
     strcat(strAux,pDns);
@@ -261,8 +265,12 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem));
     resetVariables();
     Serial1.println(ptBufferTcpOut);
-    PT_WAIT_UNTIL(pt, (millis()-timestamp > 10*timeOutModem) || reciveFromServer("+TCP"));
-    if(millis()-timestamp > 10*timeOutModem) break;
+    if(conRespuesta){
+      PT_WAIT_UNTIL(pt, (millis()-timestamp > 10*timeOutModem) || reciveFromServer("+TCP"));
+      if(millis()-timestamp > 10*timeOutModem) break;
+    }else{
+      PT_WAIT_UNTIL(pt, (millis()-timestamp > 5*timeOutModem));
+    }
     resetVariables();
     Serial1.println("AT+TCPCLOSE=0");
     //(*OK_ERROR_MODEM = MESSAGE_RECIVED_TCP) ? *OK_ERROR_MODEM = MESSAGE_RECIVED_TCP: *OK_ERROR_MODEM = OK_MODEM;
@@ -270,11 +278,11 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     *OK_ERROR_MODEM = MESSAGE_RECIVED_TCP;
     ESTADO_MODEM = NO_TASK_MODEM;
     resetVariables();
-  }//
+  }
   PT_END(pt);
 }
 
-void enviarDatosTCP(char* TCPBufferOut, char* dns, char *mensajeTcpRecivido){
+void enviarDatosTCP(char* TCPBufferOut, char* dns, char *mensajeTcpRecivido, bool respuesta){
   /*!
    * Funcion Publica
    * Asigno el contenido de los punteros que vienen del main al los punteros internos del Modem.cpp  
@@ -286,6 +294,7 @@ void enviarDatosTCP(char* TCPBufferOut, char* dns, char *mensajeTcpRecivido){
   ptBufferTcpOut = TCPBufferOut;
   pDns = dns;
   modemBufferIn = mensajeTcpRecivido;
+  conRespuesta = respuesta;
   //mensajeTcpRecivido = modemBufferIn;
    //OK_ERROR_MODEM = errorModem;
   *OK_ERROR_MODEM = ERROR_MODEM;
