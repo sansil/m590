@@ -1,33 +1,33 @@
 #include "Modem.h"
 
   
-static char strAux[50]; //!<String auxiliar para cargar el mensaje TCPSEND
-static char strAux2[250]; //!<String auxiliar para cargar el mensaje TCPSEND
+char strAux[50]; //!<String auxiliar para cargar el mensaje TCPSEND
+char strAux2[250]; //!<String auxiliar para cargar el mensaje TCPSEND
 char* modemBufferIn;
-static char ipServer[20]; 
+char ipServer[20]; 
 bool conRespuesta =true;
 char s[2]; //!< auxiliar .
-static  struct pt pt1, pt2,pt3, pt4, pt5; //!< cada protohtread necesita uno de estos
+struct pt pt1, pt2,pt3, pt4, pt5; //!< cada protohtread necesita uno de estos
 //variables para checkResponseATcommand.
-static volatile  int iATcommand=0;
-//static int answer;
+int iATcommand=0;
+// int answer;
 MODEM_STATE ESTADO_MODEM = NO_TASK_MODEM;
 MODEM_STATE* OK_ERROR_MODEM;
 //variables de tcp/ip
-static char* ptch;
-static char* pDns;
-static char* ptBufferTcpOut;
+char* ptch;
+char* pDns;
+char* ptBufferTcpOut;
 //variables send sms
-static char* pMensajeSms;
-static char* pNumeroTel;
+char* pMensajeSms;
+char* pNumeroTel;
 //variables de ftp
 uint16_t puertoFtp=0;
 uint16_t largoFile=0;
-static char* pFile;
-static char* pUser;
-static char* pPwd;
-static volatile unsigned long timestamp = 0;
-static volatile  unsigned long timeOutModem = 0;
+char* pFile;
+char* pUser;
+char* pPwd;
+unsigned long timestamp = 0;
+unsigned long timeOutModem = 0;
 uint16_t volatile puerto = 0;
 
 void resetVariables();
@@ -244,8 +244,8 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     strcat(strAux,pDns);
     strcat(strAux,"\"");
     Serial1.println(strAux); 
-    PT_WAIT_UNTIL(pt, sendATcommandForDNS("+DNS:") || millis() - timestamp > 3*timeOutModem ); // espero la respuesta +DNS=IP
-    if(millis()-timestamp > 3*timeOutModem) break;
+    PT_WAIT_UNTIL(pt, sendATcommandForDNS("+DNS:") || millis() - timestamp > 4*timeOutModem ); // espero la respuesta +DNS=IP
+    if(millis()-timestamp > 4*timeOutModem) break;
     resetVariables();
     strcpy(strAux,"AT+TCPSETUP=0,");
     strcat(strAux,ipServer);
@@ -253,9 +253,10 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     sprintf(s,"%d",puerto);
     strcat(strAux,s);
     Serial1.println(strAux);
-    PT_WAIT_UNTIL(pt, (millis()-timestamp > 5*timeOutModem) || checkResponseATcommand("","+TCPSETUP:0,OK")); 
-    if(millis()-timestamp > 5*timeOutModem) {
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > 6*timeOutModem) || checkResponseATcommand("","+TCPSETUP:0,OK")); 
+    if(millis()-timestamp > 6*timeOutModem) {
       Serial1.println("AT+TCPCLOSE=0"); //!< cierro conexion por las dudas que halla quedado abierta de antes.
+      PT_WAIT_UNTIL(pt, (millis()-timestamp > 7*timeOutModem));
       break;
     }
     resetVariables();
@@ -275,9 +276,9 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     Serial1.println("AT+TCPCLOSE=0");
     //(*OK_ERROR_MODEM = MESSAGE_RECIVED_TCP) ? *OK_ERROR_MODEM = MESSAGE_RECIVED_TCP: *OK_ERROR_MODEM = OK_MODEM;
     PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem) || checkResponseATcommand("","+TCPCLOSE:0"));
-    *OK_ERROR_MODEM = MESSAGE_RECIVED_TCP;
     ESTADO_MODEM = NO_TASK_MODEM;
     resetVariables();
+    *OK_ERROR_MODEM = MESSAGE_RECIVED_TCP;
   }
   PT_END(pt);
 }
@@ -337,8 +338,8 @@ void resetVariables(){
   * Esta funcion es llamada internamente por funcinoes internas del modem
   * resetea valores de algunas variables globales 
   */
-  memset(strAux2,'\0', 250);
-  memset(strAux,'\0', 50);
+  memset(strAux2,'\0', strlen(strAux2));
+  memset(strAux,'\0', strlen(strAux));
   while(Serial1.available() > 0) Serial1.read();
   iATcommand=0;
   timestamp = millis();
@@ -372,6 +373,9 @@ int _resetearModem(struct pt *pt){
 void resetearModem(){
 
   Serial.println("reseteando Modem...");
+  Serial.println(ipServer);
+  Serial.println(pDns);
+  Serial.println(ptBufferTcpOut);
   ESTADO_MODEM = RESET_MODEM;
   // delay(1000);
   // //chequeo intensidad de senal 
@@ -441,7 +445,7 @@ int _sendFtpFile(struct pt *pt){
     Serial.println("Me logee*****");
     PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem));
     //escribir archivo conntenido en SD.
-    sendSDfileToserver(pFile);
+    //sendSDfileToserver(pFile);
     PT_WAIT_UNTIL(pt, (millis()-timestamp > 6*timeOutModem) || checkResponseATcommand("","+FTPPUT :OK"));
     if(millis()-timestamp > 6*timeOutModem) break;
     //Logout
