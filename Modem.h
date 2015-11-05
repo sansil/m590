@@ -3,6 +3,9 @@
 
 #include "Arduino.h"
 #include "pt.h"
+
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <avr/io.h>
 #include <HardwareSerial.h>

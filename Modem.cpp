@@ -1,33 +1,33 @@
 #include "Modem.h"
 
   
-char strAux[50]; //!<String auxiliar para cargar el mensaje TCPSEND
-char strAux2[250]; //!<String auxiliar para cargar el mensaje TCPSEND
+static char strAux[50]; //!<String auxiliar para cargar el mensaje TCPSEND
+static char strAux2[250]; //!<String auxiliar para cargar el mensaje TCPSEND
 char* modemBufferIn;
-char ipServer[20]; 
+static char ipServer[20]; 
 bool conRespuesta =true;
 char s[2]; //!< auxiliar .
-struct pt pt1, pt2,pt3, pt4, pt5; //!< cada protohtread necesita uno de estos
+static  struct pt pt1, pt2,pt3, pt4, pt5; //!< cada protohtread necesita uno de estos
 //variables para checkResponseATcommand.
-int iATcommand=0;
-// int answer;
+static volatile  int iATcommand=0;
+//static int answer;
 MODEM_STATE ESTADO_MODEM = NO_TASK_MODEM;
 MODEM_STATE* OK_ERROR_MODEM;
 //variables de tcp/ip
-char* ptch;
-char* pDns;
-char* ptBufferTcpOut;
+static char* ptch;
+static char* pDns;
+static char* ptBufferTcpOut;
 //variables send sms
-char* pMensajeSms;
-char* pNumeroTel;
+static char* pMensajeSms;
+static char* pNumeroTel;
 //variables de ftp
 uint16_t puertoFtp=0;
 uint16_t largoFile=0;
-char* pFile;
-char* pUser;
-char* pPwd;
-unsigned long timestamp = 0;
-unsigned long timeOutModem = 0;
+static char* pFile;
+static char* pUser;
+static char* pPwd;
+static volatile unsigned long timestamp = 0;
+static volatile  unsigned long timeOutModem = 0;
 uint16_t volatile puerto = 0;
 
 void resetVariables();
@@ -52,7 +52,8 @@ boolean checkResponseATcommand(char* comando ,char* respuestaEsperada){
     }
   }
   //Serial.println(strAux2);
-  if((comando != "") && (ret == false) && (strstr(strAux2,"+CREG: 0,3")!= NULL)){
+  if((comando != "") && (ret == false) && (strstr(strAux2,"+CREG: 0,1")!= NULL)){
+   // delay(1000);
     Serial1.println(comando);
     memset(strAux2,'/0',250);
   }
@@ -190,6 +191,7 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
       if(millis()-timestamp>timeOutModem)  break;
       resetVariables();
       Serial1.println("AT+CREG?");
+      PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem));
       PT_WAIT_UNTIL(pt, (millis()-timestamp > 16*timeOutModem) || checkResponseATcommand("AT+CREG?","+CREG: 0,1"));
       if(millis()-timestamp > 16*timeOutModem)  break;
       resetVariables();
@@ -239,13 +241,13 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     //primero verifico si ya estoy conectado
     //Serial1.println("AT+IPSTATUS=0");
     //PT_WAIT_UNTIL(pt, (millis()-timestamp > 3*timeOutModem) || checkResponseATcommand("","CONNECT"));
-    memset(ipServer,'\0',20); // borro el bufferIp antes de empezar.
+    
     strcpy(strAux,"AT+DNS=\"");
     strcat(strAux,pDns);
     strcat(strAux,"\"");
     Serial1.println(strAux); 
-    PT_WAIT_UNTIL(pt, sendATcommandForDNS("+DNS:") || millis() - timestamp > 4*timeOutModem ); // espero la respuesta +DNS=IP
-    if(millis()-timestamp > 4*timeOutModem) break;
+    PT_WAIT_UNTIL(pt, sendATcommandForDNS("+DNS:") || millis() - timestamp > 3*timeOutModem ); // espero la respuesta +DNS=IP
+    if(millis()-timestamp > 3*timeOutModem) break;
     resetVariables();
     strcpy(strAux,"AT+TCPSETUP=0,");
     strcat(strAux,ipServer);
@@ -253,17 +255,17 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     sprintf(s,"%d",puerto);
     strcat(strAux,s);
     Serial1.println(strAux);
-    PT_WAIT_UNTIL(pt, (millis()-timestamp > 6*timeOutModem) || checkResponseATcommand("","+TCPSETUP:0,OK")); 
-    if(millis()-timestamp > 6*timeOutModem) {
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > 5*timeOutModem) || checkResponseATcommand("","+TCPSETUP:0,OK")); 
+    if(millis()-timestamp > 5*timeOutModem) {
+      PT_WAIT_UNTIL(pt, (millis()-timestamp > 6*timeOutModem));
       Serial1.println("AT+TCPCLOSE=0"); //!< cierro conexion por las dudas que halla quedado abierta de antes.
-      PT_WAIT_UNTIL(pt, (millis()-timestamp > 7*timeOutModem));
       break;
     }
     resetVariables();
     sprintf(strAux,"AT+TCPSEND=0,%d",strlen(ptBufferTcpOut));
     Serial.println(strAux);
     Serial1.println(strAux);
-    PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem));
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem));
     resetVariables();
     Serial1.println(ptBufferTcpOut);
     if(conRespuesta){
@@ -276,9 +278,10 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     Serial1.println("AT+TCPCLOSE=0");
     //(*OK_ERROR_MODEM = MESSAGE_RECIVED_TCP) ? *OK_ERROR_MODEM = MESSAGE_RECIVED_TCP: *OK_ERROR_MODEM = OK_MODEM;
     PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem) || checkResponseATcommand("","+TCPCLOSE:0"));
+    *OK_ERROR_MODEM = MESSAGE_RECIVED_TCP;
+    memset(ipServer,'\0',20); // borro el bufferIp antes de empezar.
     ESTADO_MODEM = NO_TASK_MODEM;
     resetVariables();
-    *OK_ERROR_MODEM = MESSAGE_RECIVED_TCP;
   }
   PT_END(pt);
 }
@@ -338,30 +341,15 @@ void resetVariables(){
   * Esta funcion es llamada internamente por funcinoes internas del modem
   * resetea valores de algunas variables globales 
   */
-  memset(strAux2,'\0', strlen(strAux2));
-  memset(strAux,'\0', strlen(strAux));
+  memset(strAux2,'\0', 250);
+  memset(strAux,'\0', 50);
   while(Serial1.available() > 0) Serial1.read();
   iATcommand=0;
   timestamp = millis();
   //answer = 0;
 }
 
-int _resetearModem(struct pt *pt){
-  PT_BEGIN(pt);
-    resetVariables();
-    PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem));
-    //chequeo intensidad de senal 
-    Serial.println("intensidad de senal: ");
-    Serial1.println("AT+CSQ");
-    resetVariables();
-    PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem) || checkResponseATcommand("","OK"));
-    resetVariables();
-    Serial1.println(Serial1.println("AT+TCPCLOSE=0"));
-    PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem) || checkResponseATcommand("","OK"));
-    *OK_ERROR_MODEM = OK_MODEM;
-    ESTADO_MODEM = INIT_MODEM; //reseteo el modem.
-  PT_END(pt);
-}
+
 
 // int freeRam () 
 // {
@@ -377,15 +365,24 @@ void resetearModem(){
   Serial.println(pDns);
   Serial.println(ptBufferTcpOut);
   ESTADO_MODEM = RESET_MODEM;
-  // delay(1000);
-  // //chequeo intensidad de senal 
-  // Serial1.println("AT+CSQ");
-  // Serial1.println("AT+TCPCLOSE=0"); //cierro puerto TCO
-  // delay(2000);
-  // Serial1.println("AT+FTPLOGOUT"); // cieroo puerto FTP
-  // *OK_ERROR_MODEM = OK_MODEM;
-  // ESTADO_MODEM = INIT_MODEM; //reseteo el modem.
 }
+int _resetearModem(struct pt *pt){
+  PT_BEGIN(pt);
+    resetVariables();
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem));
+    //chequeo intensidad de senal 
+    Serial.println("intensidad de senal: ");
+    Serial1.println("AT+CSQ");
+    resetVariables();
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem) || checkResponseATcommand("","OK"));
+    resetVariables();
+    Serial1.println(Serial1.println("AT+TCPCLOSE=0"));
+    PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem) || checkResponseATcommand("","OK"));
+    //*OK_ERROR_MODEM = OK_MODEM;
+    ESTADO_MODEM = INIT_MODEM; //reseteo el modem.
+  PT_END(pt);
+}
+
 
 void clearErrorModem(MODEM_STATE* errorModem){
   *errorModem = OK_MODEM;
