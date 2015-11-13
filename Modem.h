@@ -13,6 +13,9 @@
 
 typedef enum MODEM_STATE {OK_MODEM,ERROR_MODEM,SEND_SMS_MODEM,INIT_MODEM, SEND_TCP_MODEM, SEND_FTP_FILE, MESSAGE_RECIVED_TCP, RESET_MODEM, NO_TASK_MODEM};
 
+#define LOG_MODEM(X) Serial.print(X)
+#define LOGn_MODEM(X) Serial.println(X)
+
 void initModem(uint16_t unPuerto, uint16_t untimeout, MODEM_STATE* errorModem);
 void enviarDatosTCP(char* TCPBufferOut, char* dns, char *mensajeTcpRecivido, bool respuesta);
 void sendFtpFile(char* dns,char* file, uint16_t largoFile, uint16_t port, char* user, char* pwd);

@@ -46,8 +46,8 @@ boolean checkResponseATcommand(char* comando ,char* respuestaEsperada){
   iATcommand++;
   if (strstr(strAux2, respuestaEsperada) != NULL){
     ret = true; 
-    Serial.println("es trueee");
-    Serial.println(strAux2);
+    LOG_MODEM("Resp com AT: ");
+    LOGn_MODEM(strAux2);
     break;
     }
   }
@@ -83,14 +83,14 @@ uint8_t sendATcommandForDNS(char* respuestaEsperada){
         ptch = strAux2 +strlen(strAux2) ;
         Serial.println(strAux2);
         while ((strcmp(ptch-1,"\n")!=0) && (answer ==0) && (millis() - timestamp < 3*timeOutModem) ) { // quedo apuntando en la fila del +DNS:ip yo me quiereo quedar con el ip.
-         Serial.println("0000000");
+         LOGn_MODEM("0000000");
          if(Serial1.available()!=0){
             strAux2[iATcommand] = (char)Serial1.read();          
             ipServer[j] = *ptch;  // solo me importa a partir de +DNS:
             j++;
             iATcommand++;
             ptch++; 
-            Serial.println(ipServer);  
+            LOGn_MODEM(ipServer);  
        //delay(100);     
           }
         } 
@@ -150,19 +150,19 @@ uint8_t reciveFromServer(char* respuestaEsperada){
         if (millis() - timestamp < 7*timeOutModem){
           answer = 1;
           *(modemBufferIn -1) = '\0';
-          Serial.println();
+          //Serial.println();
           //Serial.print("Mensaje Recivdo desde el Servidor: ");
           //Serial.println(strAux2);
-          Serial.print(modemBufferIn);
-          Serial.println();
+          //Serial.print(modemBufferIn);
+          //Serial.println();
           //*OK_ERROR_MODEM = MESSAGE_RECIVED_TCP;
           //*OK_ERROR_MODEM = OK_MODEM; //agregar esto una vez que hable con el mac
           break;
         }else{
           //OK_ERROR_MODEM = ERROR_MODEM; //cambiar
           answer = 0;
-          Serial.print("NOOOOOO Coincidio primera respuesta");
-          Serial.println(strAux2);
+          LOGn_MODEM("Error en Mensaje del Servidor...");
+          LOGn_MODEM(strAux2);
         }
       }
   }
@@ -212,7 +212,7 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
       if(millis()-timestamp>2*timeOutModem) break;
       resetVariables();
       PT_WAIT_UNTIL(pt, millis()-timestamp > 10*timeOutModem); 
-      Serial.println("END");
+      LOGn_MODEM("Modem iniciado con exito...");
       ESTADO_MODEM = NO_TASK_MODEM;
       *OK_ERROR_MODEM = OK_MODEM;
     }
@@ -236,7 +236,7 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
   //Serial.println(ptch);
   while(ESTADO_MODEM == SEND_TCP_MODEM){
     //*OK_ERROR_MODEM = ERROR_MODEM;
-    Serial.println("Entre a SEND_TCP_MODEM");
+    LOGn_MODEM("Configuando envio TCP...");
     resetVariables();
     //primero verifico si ya estoy conectado
     //Serial1.println("AT+IPSTATUS=0");
@@ -246,8 +246,8 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     strcat(strAux,pDns);
     strcat(strAux,"\"");
     Serial1.println(strAux); 
-    PT_WAIT_UNTIL(pt, sendATcommandForDNS("+DNS:") || millis() - timestamp > 3*timeOutModem ); // espero la respuesta +DNS=IP
-    if(millis()-timestamp > 3*timeOutModem) break;
+    PT_WAIT_UNTIL(pt, sendATcommandForDNS("+DNS:") || millis() - timestamp > 5*timeOutModem ); // espero la respuesta +DNS=IP
+    if(millis()-timestamp > 5*timeOutModem) break;
     resetVariables();
     strcpy(strAux,"AT+TCPSETUP=0,");
     strcat(strAux,ipServer);
@@ -257,13 +257,14 @@ int _initModem(struct pt *pt){ //le borre el static al ppio
     Serial1.println(strAux);
     PT_WAIT_UNTIL(pt, (millis()-timestamp > 5*timeOutModem) || checkResponseATcommand("","+TCPSETUP:0,OK")); 
     if(millis()-timestamp > 5*timeOutModem) {
+        Serial1.println("AT+TCPCLOSE=0"); //!< cierro conexion por las dudas que halla quedado abierta de antes.
       PT_WAIT_UNTIL(pt, (millis()-timestamp > 6*timeOutModem));
-      Serial1.println("AT+TCPCLOSE=0"); //!< cierro conexion por las dudas que halla quedado abierta de antes.
+      
       break;
     }
     resetVariables();
     sprintf(strAux,"AT+TCPSEND=0,%d",strlen(ptBufferTcpOut));
-    Serial.println(strAux);
+    LOGn_MODEM(strAux);
     Serial1.println(strAux);
     PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem));
     resetVariables();
@@ -360,7 +361,7 @@ void resetVariables(){
 
 void resetearModem(){
 
-  Serial.println("reseteando Modem...");
+  LOGn_MODEM("reseteando Modem...");
   Serial.println(ipServer);
   Serial.println(pDns);
   Serial.println(ptBufferTcpOut);
@@ -371,12 +372,12 @@ int _resetearModem(struct pt *pt){
     resetVariables();
     PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem));
     //chequeo intensidad de senal 
-    Serial.println("intensidad de senal: ");
-    Serial1.println("AT+CSQ");
+    LOG_MODEM("intensidad de senal: ");
+    LOGn_MODEM("AT+CSQ");
     resetVariables();
     PT_WAIT_UNTIL(pt, (millis()-timestamp > timeOutModem) || checkResponseATcommand("","OK"));
     resetVariables();
-    Serial1.println(Serial1.println("AT+TCPCLOSE=0"));
+    Serial1.println("AT+TCPCLOSE=0");
     PT_WAIT_UNTIL(pt, (millis()-timestamp > 2*timeOutModem) || checkResponseATcommand("","OK"));
     //*OK_ERROR_MODEM = OK_MODEM;
     ESTADO_MODEM = INIT_MODEM; //reseteo el modem.
